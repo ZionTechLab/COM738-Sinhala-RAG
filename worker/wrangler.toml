@@ -1,0 +1,36 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "com738-rag-worker"
+main = "src/index.ts"
+compatibility_date = "2025-07-28"
+compatibility_flags = ["nodejs_compat"]
+keep_assets = true
+keep_vars = true
+
+# ── Workers AI ──
+# Enabled via Cloudflare Dashboard → Workers & Pages → com738-rag-worker → Settings → AI
+# Models used:
+#   - @cf/meta/llama-3.1-8b-instruct-fp8  (text generation, free — 10K/day)
+#   - @cf/baai/bge-m3                       (embeddings, free)
+
+[ai]
+binding = "AI"
+
+# ── Vectorize (embedding index) ──
+# Created with: npx wrangler vectorize create com738-rag-index --dimensions=1024 --metric=cosine
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "com738-rag-index"
+
+# ── R2 (PDF storage) ──
+# Created with: npx wrangler r2 bucket create com738-rag-pdfs
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "com738-rag-pdfs"
+
+# ── No secrets needed — everything runs on Cloudflare free tier ──
+
+[observability]
+enabled = true
+
+[env.production]
+name = "com738-rag-worker"
