@@ -6,10 +6,11 @@ interface SidebarProps {
   topK: number
   setTopK: (v: number) => void
   loading: boolean
+  onClose?: () => void
 }
 
 const MODE_LABELS: Record<string, string> = {
-  rag: 'Grounded RAG (E5 + DeepSeek v4)',
+  rag: 'Grounded RAG (E5 + Llama 3.1)',
   baseline_a: 'Baseline A: Ungrounded LLM',
   baseline_b: 'Baseline B: Prompt-Constrained',
 }
@@ -21,9 +22,22 @@ const COLLECTION_LABELS: Record<string, string> = {
   syllabus_sliding_e5: 'Sliding Window 800c (E5)',
 }
 
-export function Sidebar({ mode, setMode, collection, setCollection, topK, setTopK, loading }: SidebarProps) {
+export function Sidebar({ mode, setMode, collection, setCollection, topK, setTopK, loading, onClose }: SidebarProps) {
   return (
-    <aside className="bg-card border border-card-border rounded-xl p-5 flex flex-col gap-5 w-72 shrink-0">
+    <aside className="bg-card border border-card-border rounded-xl p-4 md:p-5 flex flex-col gap-4 md:gap-5 w-72 shrink-0 max-h-[calc(100vh-2rem)] overflow-y-auto">
+      {/* Close button — mobile only */}
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="self-end text-text-muted hover:text-text-main md:hidden p-1"
+          aria-label="Close menu"
+        >
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+
       <SectionHeader title="Pipeline Controls" />
 
       <FormGroup label="Execution Mode">
@@ -31,7 +45,7 @@ export function Sidebar({ mode, setMode, collection, setCollection, topK, setTop
           value={mode}
           onChange={e => setMode(e.target.value)}
           disabled={loading}
-          className="bg-dark border border-card-border text-text-main p-2.5 rounded-md font-sans text-sm"
+          className="bg-dark border border-card-border text-text-main p-2.5 rounded-md font-sans text-sm w-full"
         >
           {Object.entries(MODE_LABELS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
@@ -44,7 +58,7 @@ export function Sidebar({ mode, setMode, collection, setCollection, topK, setTop
           value={collection}
           onChange={e => setCollection(e.target.value)}
           disabled={loading}
-          className="bg-dark border border-card-border text-text-main p-2.5 rounded-md font-sans text-sm"
+          className="bg-dark border border-card-border text-text-main p-2.5 rounded-md font-sans text-sm w-full"
         >
           {Object.entries(COLLECTION_LABELS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
@@ -60,7 +74,7 @@ export function Sidebar({ mode, setMode, collection, setCollection, topK, setTop
           value={topK}
           onChange={e => setTopK(Number(e.target.value))}
           disabled={loading}
-          className="accent-primary"
+          className="accent-primary w-full"
         />
       </FormGroup>
 
@@ -83,7 +97,7 @@ export function Sidebar({ mode, setMode, collection, setCollection, topK, setTop
 }
 
 function SectionHeader({ title }: { title: string }) {
-  return <div className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">{title}</div>
+  return <div className="text-[10px] md:text-xs font-bold text-text-muted uppercase tracking-wider">{title}</div>
 }
 
 function FormGroup({ label, children }: { label: string; children: React.ReactNode }) {

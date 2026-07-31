@@ -9,7 +9,7 @@ interface GeneratedAnswerProps {
 }
 
 const MODE_PILLS: Record<string, { label: string; bg: string; color: string }> = {
-  rag: { label: 'DeepSeek v4 · Grounded', bg: 'bg-tag-bg', color: 'text-tag-text' },
+  rag: { label: 'Llama 3.1 8B · Grounded', bg: 'bg-tag-bg', color: 'text-tag-text' },
   baseline_a: { label: 'Ungrounded LLM', bg: 'bg-red-950', color: 'text-red-400' },
   baseline_b: { label: 'Constrained · No Context', bg: 'bg-amber-950', color: 'text-amber-400' },
 }
