@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
 import { QueryInput } from './components/QueryInput'
@@ -18,7 +18,16 @@ export default function App() {
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
-  const [defaultModel, setDefaultModel] = useState('llama-8b')
+
+  // Refs to avoid stale closures
+  const modeRef = useRef(mode)
+  const collectionRef = useRef(collection)
+  const topKRef = useRef(topK)
+  const modelRef = useRef(model)
+  modeRef.current = mode
+  collectionRef.current = collection
+  topKRef.current = topK
+  modelRef.current = model
 
   // Fetch available models on mount
   useEffect(() => {
@@ -28,29 +37,32 @@ export default function App() {
           setAvailableModels(h.availableModels)
         }
         if (h.defaultModel) {
-          setDefaultModel(h.defaultModel)
           setModel(h.defaultModel)
         }
       })
       .catch(() => {
-        // Offline — use hardcoded defaults
         setAvailableModels([
           { key: 'llama-8b',  id: '@cf/meta/llama-3.1-8b-instruct-fp8',        name: 'Llama 3.1 8B',    params: '8B' },
           { key: 'llama-70b', id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',   name: 'Llama 3.1 70B',   params: '70B' },
           { key: 'llama-33',  id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',   name: 'Llama 3.3 70B',   params: '70B' },
-          { key: 'mistral',   id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral 24B',    params: '24B' },
         ])
       })
   }, [])
 
   const handleQuery = useCallback(
-    async (question: string, mdl?: string) => {
+    async (question: string) => {
       setLoading(true)
       setError(null)
       setSidebarOpen(false)
       try {
-        const m = mdl || model
-        const data = await queryRAG({ question, mode, collection, topK, model: m })
+        // Read from refs to avoid stale state
+        const data = await queryRAG({
+          question,
+          mode: modeRef.current,
+          collection: collectionRef.current,
+          topK: topKRef.current,
+          model: modelRef.current,
+        })
         setResult(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Query failed')
@@ -59,14 +71,8 @@ export default function App() {
         setLoading(false)
       }
     },
-    [mode, collection, topK, model]
+    [] // no deps — refs handle freshness
   )
-
-  const handleModeChange = (v: string) => {
-    if (v === 'rag' || v === 'baseline_a' || v === 'baseline_b') {
-      setMode(v)
-    }
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-dark">
@@ -85,7 +91,7 @@ export default function App() {
         <div className="hidden md:block shrink-0">
           <Sidebar
             mode={mode}
-            setMode={handleModeChange}
+            setMode={setMode}
             collection={collection}
             setCollection={setCollection}
             topK={topK}
@@ -105,7 +111,7 @@ export default function App() {
         >
           <Sidebar
             mode={mode}
-            setMode={handleModeChange}
+            setMode={setMode}
             collection={collection}
             setCollection={setCollection}
             topK={topK}
@@ -134,12 +140,7 @@ export default function App() {
             <span className="text-sm font-semibold text-primary truncate">Sinhala RAG · COM738</span>
           </div>
 
-          <QueryInput
-            onQuery={(q, _mode, mdl) => handleQuery(q, mdl)}
-            loading={loading}
-            defaultModel={defaultModel}
-            availableModels={availableModels}
-          />
+          <QueryInput onQuery={handleQuery} loading={loading} />
 
           {error && (
             <div className="bg-red-950 border border-red-700 text-red-300 px-4 md:px-5 py-3 rounded-lg text-sm font-mono">

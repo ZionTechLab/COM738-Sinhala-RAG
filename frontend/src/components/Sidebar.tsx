@@ -1,8 +1,8 @@
 import type { ModelInfo } from '../types'
 
 interface SidebarProps {
-  mode: string
-  setMode: (v: string) => void
+  mode: 'rag' | 'baseline_a' | 'baseline_b'
+  setMode: (v: 'rag' | 'baseline_a' | 'baseline_b') => void
   collection: string
   setCollection: (v: string) => void
   topK: number
@@ -48,7 +48,7 @@ export function Sidebar({ mode, setMode, collection, setCollection, topK, setTop
       <FormGroup label="Execution Mode">
         <select
           value={mode}
-          onChange={e => setMode(e.target.value)}
+          onChange={e => setMode(e.target.value as 'rag' | 'baseline_a' | 'baseline_b')}
           disabled={loading}
           className="bg-dark border border-card-border text-text-main p-2.5 rounded-md font-sans text-sm w-full"
         >

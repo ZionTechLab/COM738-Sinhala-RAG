@@ -7,7 +7,7 @@ interface QueryRequest {
   mode: 'rag' | 'baseline_a' | 'baseline_b'
   collection: string
   topK: number
-  model?: string  // user-selectable model
+  model?: string
 }
 
 interface Chunk {
@@ -42,10 +42,14 @@ const MODELS: Record<string, { id: string; name: string; params: string }> = {
   'llama-8b':  { id: '@cf/meta/llama-3.1-8b-instruct-fp8',        name: 'Llama 3.1 8B',    params: '8B' },
   'llama-70b': { id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',   name: 'Llama 3.1 70B',   params: '70B' },
   'llama-33':  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',   name: 'Llama 3.3 70B',   params: '70B' },
-  'mistral':   { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral 24B',    params: '24B' },
 }
 
 const DEFAULT_MODEL = 'llama-8b'
+
+// ── Vectorize collection names (metadata filter targets) ──
+// All 75 passages were migrated to the single com738-rag-index.
+// "collection" is the chunking strategy used — passed as metadata filter.
+// Available: syllabus_paragraph_e5, syllabus_section_e5, pastpaper_question_e5, syllabus_sliding_e5
 
 // ── Sinhala prompts ──
 
@@ -102,7 +106,7 @@ async function embedQuery(ai: Ai, query: string): Promise<number[]> {
 async function handleHealth(): Promise<Response> {
   return Response.json({
     status: 'ok',
-    vectorDb: 'Cloudflare Vectorize',
+    vectorDb: 'Cloudflare Vectorize (com738-rag-index)',
     embeddingModel: '@cf/baai/bge-m3',
     availableModels: Object.keys(MODELS).map(k => ({ key: k, ...MODELS[k] })),
     defaultModel: DEFAULT_MODEL,
