@@ -34,3 +34,14 @@ enabled = true
 
 [env.production]
 name = "com738-rag-worker"
+
+[env.production.ai]
+binding = "AI"
+
+[[env.production.vectorize]]
+binding = "VECTORIZE"
+index_name = "com738-rag-index"
+
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "com738-rag-pdfs"
