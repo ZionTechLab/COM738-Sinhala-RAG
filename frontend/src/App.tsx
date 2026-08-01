@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { Header } from './components/Header'
 import { SplashScreen } from './components/SplashScreen'
 import { LoginScreen } from './components/LoginScreen'
+import { HamburgerMenu } from './components/HamburgerMenu'
+import { AboutModal } from './components/AboutModal'
 import { ParameterBar } from './components/ParameterBar'
 import { QueryInput } from './components/QueryInput'
 import { ChunkList } from './components/ChunkList'
@@ -24,6 +26,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   const modeRef = useRef(mode)
   const collectionRef = useRef(collection)
@@ -35,11 +39,8 @@ export default function App() {
   modelRef.current = model
 
   useEffect(() => {
-    if (darkMode) {
-      document.body.classList.remove('light')
-    } else {
-      document.body.classList.add('light')
-    }
+    if (darkMode) document.body.classList.remove('light')
+    else document.body.classList.add('light')
     localStorage.setItem('studymate-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
@@ -88,6 +89,11 @@ export default function App() {
     []
   )
 
+  const handleOpenAbout = () => {
+    setMenuOpen(false)
+    setAboutOpen(true)
+  }
+
   if (phase === 'splash') {
     return <SplashScreen onDone={() => setPhase('login')} />
   }
@@ -98,7 +104,14 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-dark">
-      <Header darkMode={darkMode} onToggleTheme={() => setDarkMode(d => !d)} />
+      <Header
+        darkMode={darkMode}
+        onToggleTheme={() => setDarkMode(d => !d)}
+        onOpenAbout={() => setMenuOpen(true)}
+      />
+
+      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} onOpenAbout={handleOpenAbout} />
+      <AboutModal open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       <div className="flex gap-4 md:gap-6 p-3 md:p-6 flex-1 max-w-[1600px] mx-auto w-full">
         <main className="flex flex-col gap-4 md:gap-5 flex-1 min-w-0">
@@ -119,14 +132,12 @@ export default function App() {
             </div>
           )}
 
-          {/* Answer — full width */}
           <GeneratedAnswer
             answer={result?.answer ?? ''}
             latencyMs={result?.latencyMs ?? 0}
             loading={loading}
           />
 
-          {/* Retrieved chunks — minimal, at the bottom */}
           <ChunkList chunks={result?.chunks ?? []} loading={loading} />
         </main>
       </div>

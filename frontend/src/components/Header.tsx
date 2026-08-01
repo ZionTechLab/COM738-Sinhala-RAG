@@ -1,13 +1,27 @@
 interface HeaderProps {
   darkMode: boolean
   onToggleTheme: () => void
+  onOpenAbout: () => void
 }
 
-export function Header({ darkMode, onToggleTheme }: HeaderProps) {
+export function Header({ darkMode, onToggleTheme, onOpenAbout }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-card-border px-4 md:px-8 py-3 md:py-4 flex justify-between items-center gap-3">
-      {/* Left: logo + title */}
+      {/* Left: hamburger + logo + title */}
       <div className="flex items-center gap-2 md:gap-3 min-w-0">
+        {/* Hamburger */}
+        <button
+          onClick={onOpenAbout}
+          className="text-text-muted hover:text-text-main p-1.5 rounded-lg hover:bg-dark-light transition-colors"
+          aria-label="Menu"
+        >
+          <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+
         {/* Logo */}
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-600 flex items-center justify-center shadow-md shadow-emerald-500/15 shrink-0">
           <svg width="20" height="20" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
