@@ -1,3 +1,5 @@
+import type { ModelInfo } from '../types'
+
 interface SidebarProps {
   mode: string
   setMode: (v: string) => void
@@ -5,14 +7,17 @@ interface SidebarProps {
   setCollection: (v: string) => void
   topK: number
   setTopK: (v: number) => void
+  model: string
+  setModel: (v: string) => void
+  availableModels: ModelInfo[]
   loading: boolean
   onClose?: () => void
 }
 
 const MODE_LABELS: Record<string, string> = {
-  rag: 'Grounded RAG (E5 + Llama 3.1)',
-  baseline_a: 'Baseline A: Ungrounded LLM',
-  baseline_b: 'Baseline B: Prompt-Constrained',
+  rag: 'Grounded RAG',
+  baseline_a: 'Baseline A: Ungrounded',
+  baseline_b: 'Baseline B: Constrained',
 }
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -22,7 +27,7 @@ const COLLECTION_LABELS: Record<string, string> = {
   syllabus_sliding_e5: 'Sliding Window 800c (E5)',
 }
 
-export function Sidebar({ mode, setMode, collection, setCollection, topK, setTopK, loading, onClose }: SidebarProps) {
+export function Sidebar({ mode, setMode, collection, setCollection, topK, setTopK, model, setModel, availableModels, loading, onClose }: SidebarProps) {
   return (
     <aside className="bg-card border border-card-border rounded-xl p-4 md:p-5 flex flex-col gap-4 md:gap-5 w-72 shrink-0 max-h-[calc(100vh-2rem)] overflow-y-auto">
       {/* Close button — mobile only */}
@@ -49,6 +54,21 @@ export function Sidebar({ mode, setMode, collection, setCollection, topK, setTop
         >
           {Object.entries(MODE_LABELS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+      </FormGroup>
+
+      <FormGroup label="LLM Model">
+        <select
+          value={model}
+          onChange={e => setModel(e.target.value)}
+          disabled={loading}
+          className="bg-dark border border-card-border text-text-main p-2.5 rounded-md font-sans text-sm w-full"
+        >
+          {availableModels.map(m => (
+            <option key={m.key} value={m.key}>
+              {m.name} ({m.params})
+            </option>
           ))}
         </select>
       </FormGroup>

@@ -1,29 +1,56 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Header } from './components/Header'
 import { Sidebar } from './components/Sidebar'
 import { QueryInput } from './components/QueryInput'
 import { ChunkList } from './components/ChunkList'
 import { GeneratedAnswer } from './components/GeneratedAnswer'
 import { Footer } from './components/Footer'
-import { queryRAG } from './lib/api'
-import type { QueryResponse } from './types'
+import { queryRAG, healthCheck } from './lib/api'
+import type { QueryResponse, ModelInfo } from './types'
 
 export default function App() {
   const [mode, setMode] = useState<'rag' | 'baseline_a' | 'baseline_b'>('rag')
   const [collection, setCollection] = useState('syllabus_paragraph_e5')
   const [topK, setTopK] = useState(3)
+  const [model, setModel] = useState('llama-8b')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
+  const [defaultModel, setDefaultModel] = useState('llama-8b')
+
+  // Fetch available models on mount
+  useEffect(() => {
+    healthCheck()
+      .then(h => {
+        if (h.availableModels) {
+          setAvailableModels(h.availableModels)
+        }
+        if (h.defaultModel) {
+          setDefaultModel(h.defaultModel)
+          setModel(h.defaultModel)
+        }
+      })
+      .catch(() => {
+        // Offline — use hardcoded defaults
+        setAvailableModels([
+          { key: 'llama-8b',  id: '@cf/meta/llama-3.1-8b-instruct-fp8',        name: 'Llama 3.1 8B',    params: '8B' },
+          { key: 'llama-70b', id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',   name: 'Llama 3.1 70B',   params: '70B' },
+          { key: 'llama-33',  id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',   name: 'Llama 3.3 70B',   params: '70B' },
+          { key: 'mistral',   id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral 24B',    params: '24B' },
+        ])
+      })
+  }, [])
 
   const handleQuery = useCallback(
-    async (question: string) => {
+    async (question: string, mdl?: string) => {
       setLoading(true)
       setError(null)
-      setSidebarOpen(false) // close sidebar on mobile after query
+      setSidebarOpen(false)
       try {
-        const data = await queryRAG({ question, mode, collection, topK })
+        const m = mdl || model
+        const data = await queryRAG({ question, mode, collection, topK, model: m })
         setResult(data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Query failed')
@@ -32,7 +59,7 @@ export default function App() {
         setLoading(false)
       }
     },
-    [mode, collection, topK]
+    [mode, collection, topK, model]
   )
 
   const handleModeChange = (v: string) => {
@@ -63,6 +90,9 @@ export default function App() {
             setCollection={setCollection}
             topK={topK}
             setTopK={setTopK}
+            model={model}
+            setModel={setModel}
+            availableModels={availableModels}
             loading={loading}
           />
         </div>
@@ -80,6 +110,9 @@ export default function App() {
             setCollection={setCollection}
             topK={topK}
             setTopK={setTopK}
+            model={model}
+            setModel={setModel}
+            availableModels={availableModels}
             loading={loading}
             onClose={() => setSidebarOpen(false)}
           />
@@ -101,7 +134,12 @@ export default function App() {
             <span className="text-sm font-semibold text-primary truncate">Sinhala RAG · COM738</span>
           </div>
 
-          <QueryInput onQuery={handleQuery} loading={loading} />
+          <QueryInput
+            onQuery={(q, _mode, mdl) => handleQuery(q, mdl)}
+            loading={loading}
+            defaultModel={defaultModel}
+            availableModels={availableModels}
+          />
 
           {error && (
             <div className="bg-red-950 border border-red-700 text-red-300 px-4 md:px-5 py-3 rounded-lg text-sm font-mono">
@@ -114,7 +152,6 @@ export default function App() {
             <GeneratedAnswer
               answer={result?.answer ?? ''}
               mode={result?.mode ?? mode}
-              metrics={result?.metrics}
               latencyMs={result?.latencyMs ?? 0}
               loading={loading}
             />

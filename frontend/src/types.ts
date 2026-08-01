@@ -3,6 +3,7 @@ export interface QueryRequest {
   mode: 'rag' | 'baseline_a' | 'baseline_b'
   collection: string
   topK: number
+  model?: string  // user-selectable model
 }
 
 export interface RetrievedChunk {
@@ -13,10 +14,11 @@ export interface RetrievedChunk {
   distance: number
 }
 
-export interface RAGASMetrics {
-  faithfulness: number
-  answerRelevance: number
-  contextPrecision: number
+export interface ModelInfo {
+  key: string
+  id: string
+  name: string
+  params: string
 }
 
 export interface QueryResponse {
@@ -26,12 +28,14 @@ export interface QueryResponse {
   mode: string
   collection: string
   latencyMs: number
-  metrics?: RAGASMetrics
+  model?: string
 }
 
 export interface HealthResponse {
   status: string
   vectorDb: string
-  collections: string[]
   embeddingModel: string
+  availableModels?: ModelInfo[]
+  defaultModel?: string
+  provider?: string
 }

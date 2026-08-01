@@ -7,6 +7,7 @@ interface QueryRequest {
   mode: 'rag' | 'baseline_a' | 'baseline_b'
   collection: string
   topK: number
+  model?: string  // user-selectable model
 }
 
 interface Chunk {
@@ -24,6 +25,7 @@ interface QueryResponse {
   mode: string
   collection: string
   latencyMs: number
+  model: string
 }
 
 // ── Environment ──
@@ -34,9 +36,16 @@ interface Env {
   AI: Ai
 }
 
-// ── Model ──
+// ── Available Models (Cloudflare Workers AI free tier) ──
 
-const LLM_MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8'
+const MODELS: Record<string, { id: string; name: string; params: string }> = {
+  'llama-8b':  { id: '@cf/meta/llama-3.1-8b-instruct-fp8',        name: 'Llama 3.1 8B',    params: '8B' },
+  'llama-70b': { id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',   name: 'Llama 3.1 70B',   params: '70B' },
+  'llama-33':  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',   name: 'Llama 3.3 70B',   params: '70B' },
+  'mistral':   { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral 24B',    params: '24B' },
+}
+
+const DEFAULT_MODEL = 'llama-8b'
 
 // ── Sinhala prompts ──
 
@@ -63,10 +72,10 @@ const SYSTEM_SINHALA = 'You are a Sinhala-language teaching assistant for Sri La
 
 const SYSTEM_FREE = 'You are a helpful assistant. Reply in Sinhala.'
 
-// ── Helper: call Llama 3.1 8B via Workers AI ──
+// ── Helper: call model via Workers AI ──
 
-async function callLlama(ai: Ai, prompt: string, systemMsg: string): Promise<string> {
-  const result = await ai.run(LLM_MODEL, {
+async function callModel(ai: Ai, modelId: string, prompt: string, systemMsg: string): Promise<string> {
+  const result = await ai.run(modelId, {
     messages: [
       { role: 'system', content: systemMsg },
       { role: 'user', content: prompt },
@@ -95,8 +104,9 @@ async function handleHealth(): Promise<Response> {
     status: 'ok',
     vectorDb: 'Cloudflare Vectorize',
     embeddingModel: '@cf/baai/bge-m3',
-    llm: LLM_MODEL,
-    provider: 'Cloudflare Workers AI',
+    availableModels: Object.keys(MODELS).map(k => ({ key: k, ...MODELS[k] })),
+    defaultModel: DEFAULT_MODEL,
+    provider: 'Cloudflare Workers AI (free tier)',
     timestamp: new Date().toISOString(),
   })
 }
@@ -111,7 +121,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     return new Response('Invalid JSON body', { status: 400 })
   }
 
-  const { question, mode = 'rag', topK = 3 } = body
+  const { question, mode = 'rag', topK = 3, model: modelKey = DEFAULT_MODEL } = body
 
   if (!question || typeof question !== 'string') {
     return new Response('Missing "question" field', { status: 400 })
@@ -125,13 +135,20 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     return new Response('topK must be between 1 and 10', { status: 400 })
   }
 
+  const modelInfo = MODELS[modelKey]
+  if (!modelInfo) {
+    return new Response(`Unknown model: ${modelKey}. Available: ${Object.keys(MODELS).join(', ')}`, { status: 400 })
+  }
+
+  const modelId = modelInfo.id
+
   try {
     // Baseline A: Ungrounded — no retrieval, free-form
     if (mode === 'baseline_a') {
-      const answer = await callLlama(env.AI, question, SYSTEM_FREE)
+      const answer = await callModel(env.AI, modelId, question, SYSTEM_FREE)
       const latencyMs = Date.now() - start
       return Response.json({
-        question, answer, chunks: [], mode, collection: 'none', latencyMs,
+        question, answer, chunks: [], mode, collection: 'none', latencyMs, model: modelKey,
       } satisfies QueryResponse)
     }
 
@@ -154,11 +171,11 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     // Baseline B: Constrained prompt — empty context
     if (mode === 'baseline_b') {
       const prompt = CONSTRAINED_PROMPT.replace('{{question}}', question)
-      const answer = await callLlama(env.AI, prompt, SYSTEM_SINHALA)
+      const answer = await callModel(env.AI, modelId, prompt, SYSTEM_SINHALA)
       const latencyMs = Date.now() - start
       return Response.json({
         question, answer, chunks, mode,
-        collection: body.collection || 'vectorize', latencyMs,
+        collection: body.collection || 'vectorize', latencyMs, model: modelKey,
       } satisfies QueryResponse)
     }
 
@@ -168,12 +185,12 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
       .replace('{{context}}', contextText)
       .replace('{{question}}', question)
 
-    const answer = await callLlama(env.AI, prompt, SYSTEM_SINHALA)
+    const answer = await callModel(env.AI, modelId, prompt, SYSTEM_SINHALA)
     const latencyMs = Date.now() - start
 
     return Response.json({
       question, answer, chunks, mode,
-      collection: body.collection || 'vectorize', latencyMs,
+      collection: body.collection || 'vectorize', latencyMs, model: modelKey,
     } satisfies QueryResponse)
 
   } catch (err) {
@@ -218,6 +235,8 @@ export default {
       response = await handleHealth()
     } else if (url.pathname === '/api/query' && request.method === 'POST') {
       response = await handleQuery(request, env)
+    } else if (url.pathname === '/health' && request.method === 'GET') {
+      response = await handleHealth()
     } else {
       response = new Response('Not Found', { status: 404 })
     }
