@@ -34,22 +34,27 @@ interface Env {
   VECTORIZE: VectorizeIndex
   R2: R2Bucket
   AI: Ai
+  GEMINI_API_KEY: string
 }
 
-// ── Available Models (Cloudflare Workers AI free tier) ──
+// ── Available Models ──
 
-const MODELS: Record<string, { id: string; name: string; params: string }> = {
-  'llama-8b':  { id: '@cf/meta/llama-3.1-8b-instruct-fp8',        name: 'Llama 3.1 8B',    params: '8B' },
-  'llama-70b': { id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',   name: 'Llama 3.1 70B',   params: '70B' },
-  'llama-33':  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',   name: 'Llama 3.3 70B',   params: '70B' },
+interface ModelDef {
+  provider: 'cf' | 'gemini'
+  id: string
+  name: string
+  params: string
+}
+
+const MODELS: Record<string, ModelDef> = {
+  'llama-8b':   { provider: 'cf',     id: '@cf/meta/llama-3.1-8b-instruct-fp8',       name: 'Llama 3.1 8B',      params: '8B' },
+  'llama-70b':  { provider: 'cf',     id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',  name: 'Llama 3.1 70B',     params: '70B' },
+  'llama-33':   { provider: 'cf',     id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',  name: 'Llama 3.3 70B',     params: '70B' },
+  'gemini-flash': { provider: 'gemini', id: 'gemini-2.5-flash',                          name: 'Gemini 2.5 Flash',  params: '-' },
+  'gemini-pro':   { provider: 'gemini', id: 'gemini-2.5-pro',                            name: 'Gemini 2.5 Pro',    params: '-' },
 }
 
 const DEFAULT_MODEL = 'llama-8b'
-
-// ── Vectorize collection names (metadata filter targets) ──
-// All 75 passages were migrated to the single com738-rag-index.
-// "collection" is the chunking strategy used — passed as metadata filter.
-// Available: syllabus_paragraph_e5, syllabus_section_e5, pastpaper_question_e5, syllabus_sliding_e5
 
 // ── Sinhala prompts ──
 
@@ -76,9 +81,13 @@ const SYSTEM_SINHALA = 'You are a Sinhala-language teaching assistant for Sri La
 
 const SYSTEM_FREE = 'You are a helpful assistant. Reply in Sinhala.'
 
-// ── Helper: call model via Workers AI ──
+// ── Gemini API base ──
 
-async function callModel(ai: Ai, modelId: string, prompt: string, systemMsg: string): Promise<string> {
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
+
+// ── Helper: call Cloudflare Workers AI model ──
+
+async function callCFModel(ai: Ai, modelId: string, prompt: string, systemMsg: string): Promise<string> {
   const result = await ai.run(modelId, {
     messages: [
       { role: 'system', content: systemMsg },
@@ -89,6 +98,52 @@ async function callModel(ai: Ai, modelId: string, prompt: string, systemMsg: str
   }) as { response?: string }
 
   return result.response || ''
+}
+
+// ── Helper: call Gemini via REST API ──
+
+async function callGemini(apiKey: string, modelId: string, prompt: string, systemMsg: string): Promise<string> {
+  const url = `${GEMINI_BASE}/${modelId}:generateContent?key=${apiKey}`
+
+  const body = {
+    system_instruction: {
+      parts: [{ text: systemMsg }],
+    },
+    contents: [{
+      parts: [{ text: prompt }],
+    }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: 1024,
+    },
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`Gemini API error ${res.status}: ${errText}`)
+  }
+
+  const data = await res.json() as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[]
+  }
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  return text
+}
+
+// ── Helper: route to correct provider ──
+
+async function callModel(env: Env, modelInfo: ModelDef, prompt: string, systemMsg: string): Promise<string> {
+  if (modelInfo.provider === 'gemini') {
+    return callGemini(env.GEMINI_API_KEY, modelInfo.id, prompt, systemMsg)
+  }
+  return callCFModel(env.AI, modelInfo.id, prompt, systemMsg)
 }
 
 // ── Helper: generate embedding via Workers AI ──
@@ -110,7 +165,7 @@ async function handleHealth(): Promise<Response> {
     embeddingModel: '@cf/baai/bge-m3',
     availableModels: Object.keys(MODELS).map(k => ({ key: k, ...MODELS[k] })),
     defaultModel: DEFAULT_MODEL,
-    provider: 'Cloudflare Workers AI (free tier)',
+    provider: 'Cloudflare Workers AI + Gemini',
     timestamp: new Date().toISOString(),
   })
 }
@@ -144,12 +199,10 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     return new Response(`Unknown model: ${modelKey}. Available: ${Object.keys(MODELS).join(', ')}`, { status: 400 })
   }
 
-  const modelId = modelInfo.id
-
   try {
     // Baseline A: Ungrounded — no retrieval, free-form
     if (mode === 'baseline_a') {
-      const answer = await callModel(env.AI, modelId, question, SYSTEM_FREE)
+      const answer = await callModel(env, modelInfo, question, SYSTEM_FREE)
       const latencyMs = Date.now() - start
       return Response.json({
         question, answer, chunks: [], mode, collection: 'none', latencyMs, model: modelKey,
@@ -175,7 +228,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
     // Baseline B: Constrained prompt — empty context
     if (mode === 'baseline_b') {
       const prompt = CONSTRAINED_PROMPT.replace('{{question}}', question)
-      const answer = await callModel(env.AI, modelId, prompt, SYSTEM_SINHALA)
+      const answer = await callModel(env, modelInfo, prompt, SYSTEM_SINHALA)
       const latencyMs = Date.now() - start
       return Response.json({
         question, answer, chunks, mode,
@@ -189,7 +242,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
       .replace('{{context}}', contextText)
       .replace('{{question}}', question)
 
-    const answer = await callModel(env.AI, modelId, prompt, SYSTEM_SINHALA)
+    const answer = await callModel(env, modelInfo, prompt, SYSTEM_SINHALA)
     const latencyMs = Date.now() - start
 
     return Response.json({

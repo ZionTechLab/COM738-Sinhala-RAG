@@ -45,6 +45,8 @@ export default function App() {
           { key: 'llama-8b',  id: '@cf/meta/llama-3.1-8b-instruct-fp8',        name: 'Llama 3.1 8B',    params: '8B' },
           { key: 'llama-70b', id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',   name: 'Llama 3.1 70B',   params: '70B' },
           { key: 'llama-33',  id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',   name: 'Llama 3.3 70B',   params: '70B' },
+          { key: 'gemini-flash', id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', params: '-' },
+          { key: 'gemini-pro',   id: 'gemini-2.5-pro',   name: 'Gemini 2.5 Pro',   params: '-' },
         ])
       })
   }, [])
