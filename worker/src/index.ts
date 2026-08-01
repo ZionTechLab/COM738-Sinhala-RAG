@@ -60,16 +60,10 @@ const MODELS: Record<string, ModelDef> = {
 
 const DEFAULT_MODEL = 'llama-8b'
 
-// ── Sinhala prompts ──
-
-// ── Gemini-specific Sinhala prompt (softer refusal) ──
-// Gemini models are overly obedient to "say it's not in the syllabus" —
-// they use it as an escape hatch even when context IS present.
-// Remove the fallback to force actual retrieval use.
-
-const SINHALA_PROMPT_GEMINI = `ඔබ ශ්‍රී ලංකාවේ අ.පො.ස. (සාමාන්‍ය පෙළ) ව්‍යාපාර සහ ගිණුම්කරණ අධ්‍යයන විෂය සඳහා සහායකයෙකි.
-පහත දැක්වෙන පෙළ කොටස් භාවිතා කර පිළිතුරු සපයන්න.
-පෙළ කොටස්වල ඇති තොරතුරු පමණක් භාවිතා කරන්න.
+const LLAMA_RAG_PROMPT = `ඔබ ශ්‍රී ලංකාවේ අ.පො.ස. (සාමාන්‍ය පෙළ) ව්‍යාපාර සහ ගිණුම්කරණ අධ්‍යයන විෂය සඳහා සහායකයෙකි.
+පහත දැක්වෙන පෙළ කොටස් පමණක් භාවිතා කර පිළිතුරු සපයන්න.
+පෙළ කොටස්වල අඩංගු නොවන තොරතුරු එකතු නොකරන්න.
+පෙළ කොටස් ප්‍රමාණවත් නොවේ නම්, "මෙම තොරතුරු විෂය නිර්දේශයේ අඩංගු නොවේ" යනුවෙන් සඳහන් කරන්න.
 සිංහල භාෂාවෙන් පමණක් පිළිතුරු දෙන්න.
 
 පෙළ කොටස්:
@@ -226,13 +220,27 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
       returnValues: true,
     })
 
-    const chunks: Chunk[] = results.matches.map(m => ({
-      id: m.id,
-      text: (m.values?.[0] as string) || (m.metadata?.text as string) || '',
-      source: (m.metadata?.source as string) || 'unknown',
-      chunkStrategy: (m.metadata?.chunk_strategy as string) || 'unknown',
-      distance: m.score || 0,
-    }))
+    const chunks: Chunk[] = results.matches.map(m => {
+      // Vectorize stores actual text in metadata; text is stored under 'text' key
+      const raw = m.metadata as Record<string, unknown> | undefined
+      // The text was stored under 'text' field in migration, but might be in metadata
+      // Vectorize may store the text content differently - try multiple keys
+      let text = ''
+      if (raw) {
+        text = (raw.text as string) || 
+               (raw.content as string) || 
+               (raw.document as string) ||
+               (raw.chunk_text as string) ||
+               ''
+      }
+      return {
+        id: m.id,
+        text: text,
+        source: (raw?.source as string) || 'unknown',
+        chunkStrategy: (raw?.chunkStrategy as string) || (raw?.chunk_strategy as string) || 'unknown',
+        distance: m.score || 0,
+      }
+    })
 
     // Baseline B: Constrained prompt — empty context
     if (mode === 'baseline_b') {
@@ -247,9 +255,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
     // Grounded RAG — build prompt with retrieved context
     const contextText = chunks.map((c, i) => `[${i + 1}] ${c.text}`).join('\n\n')
-    // Gemini models need the softer prompt without the "say it's missing" escape hatch
-    const promptTemplate = modelInfo.provider === 'gemini' ? SINHALA_PROMPT_GEMINI : SINHALA_PROMPT
-    const prompt = promptTemplate
+    const prompt = LLAMA_RAG_PROMPT
       .replace('{{context}}', contextText)
       .replace('{{question}}', question)
 
