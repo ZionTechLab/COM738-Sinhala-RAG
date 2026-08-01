@@ -50,8 +50,12 @@ const MODELS: Record<string, ModelDef> = {
   'llama-8b':   { provider: 'cf',     id: '@cf/meta/llama-3.1-8b-instruct-fp8',       name: 'Llama 3.1 8B',      params: '8B' },
   'llama-70b':  { provider: 'cf',     id: '@cf/meta/llama-3.1-70b-instruct-fp8-fast',  name: 'Llama 3.1 70B',     params: '70B' },
   'llama-33':   { provider: 'cf',     id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',  name: 'Llama 3.3 70B',     params: '70B' },
-  'gemini-flash': { provider: 'gemini', id: 'gemini-2.5-flash',                          name: 'Gemini 2.5 Flash',  params: '-' },
-  'gemini-pro':   { provider: 'gemini', id: 'gemini-2.5-pro',                            name: 'Gemini 2.5 Pro',    params: '-' },
+  'gemini-36-flash': { provider: 'gemini', id: 'gemini-3.6-flash',                     name: 'Gemini 3.6 Flash',  params: '-' },
+  'gemini-35-flash': { provider: 'gemini', id: 'gemini-3.5-flash',                     name: 'Gemini 3.5 Flash',  params: '-' },
+  'gemini-35-lite':  { provider: 'gemini', id: 'gemini-3.5-flash-lite',                name: 'Gemini 3.5 Lite',   params: '-' },
+  'gemini-31-lite':  { provider: 'gemini', id: 'gemini-3.1-flash-lite-preview',        name: 'Gemini 3.1 Lite',   params: '-' },
+  'gemini-3-flash':  { provider: 'gemini', id: 'gemini-3-flash-preview',               name: 'Gemini 3 Flash',    params: '-' },
+  'gemma-4':         { provider: 'gemini', id: 'gemma-4-31b-it',                        name: 'Gemma 4 31B',       params: '31B' },
 }
 
 const DEFAULT_MODEL = 'llama-8b'
