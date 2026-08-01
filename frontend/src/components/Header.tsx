@@ -8,7 +8,7 @@ export function Header() {
         </span>
         <div className="min-w-0">
           <div className="text-sm md:text-xl font-bold text-text-main truncate">
-            Sinhala RAG
+            StudyMate AI
           </div>
           <div className="text-[10px] md:text-sm text-text-muted truncate">
             O/L Business Studies · COM738
