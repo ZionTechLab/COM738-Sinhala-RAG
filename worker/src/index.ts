@@ -62,10 +62,14 @@ const DEFAULT_MODEL = 'llama-8b'
 
 // ── Sinhala prompts ──
 
-const SINHALA_PROMPT = `ඔබ ශ්‍රී ලංකාවේ අ.පො.ස. (සාමාන්‍ය පෙළ) ව්‍යාපාර සහ ගිණුම්කරණ අධ්‍යයන විෂය සඳහා සහායකයෙකි.
-පහත දැක්වෙන පෙළ කොටස් පමණක් භාවිතා කර පිළිතුරු සපයන්න.
-පෙළ කොටස්වල අඩංගු නොවන තොරතුරු එකතු නොකරන්න.
-පෙළ කොටස් ප්‍රමාණවත් නොවේ නම්, "මෙම තොරතුරු විෂය නිර්දේශයේ අඩංගු නොවේ" යනුවෙන් සඳහන් කරන්න.
+// ── Gemini-specific Sinhala prompt (softer refusal) ──
+// Gemini models are overly obedient to "say it's not in the syllabus" —
+// they use it as an escape hatch even when context IS present.
+// Remove the fallback to force actual retrieval use.
+
+const SINHALA_PROMPT_GEMINI = `ඔබ ශ්‍රී ලංකාවේ අ.පො.ස. (සාමාන්‍ය පෙළ) ව්‍යාපාර සහ ගිණුම්කරණ අධ්‍යයන විෂය සඳහා සහායකයෙකි.
+පහත දැක්වෙන පෙළ කොටස් භාවිතා කර පිළිතුරු සපයන්න.
+පෙළ කොටස්වල ඇති තොරතුරු පමණක් භාවිතා කරන්න.
 සිංහල භාෂාවෙන් පමණක් පිළිතුරු දෙන්න.
 
 පෙළ කොටස්:
@@ -109,12 +113,13 @@ async function callCFModel(ai: Ai, modelId: string, prompt: string, systemMsg: s
 async function callGemini(apiKey: string, modelId: string, prompt: string, systemMsg: string): Promise<string> {
   const url = `${GEMINI_BASE}/${modelId}:generateContent?key=${apiKey}`
 
+  // Gemini handles system_instruction unreliably for non-English.
+  // Merge system + user into a single prompt for consistent behavior.
+  const mergedPrompt = `${systemMsg}\n\n${prompt}`.replace(/\r\n/g, '\n')
+
   const body = {
-    system_instruction: {
-      parts: [{ text: systemMsg }],
-    },
     contents: [{
-      parts: [{ text: prompt }],
+      parts: [{ text: mergedPrompt }],
     }],
     generationConfig: {
       temperature: 0.3,
@@ -223,7 +228,7 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
     const chunks: Chunk[] = results.matches.map(m => ({
       id: m.id,
-      text: (m.metadata?.text as string) || '',
+      text: (m.values?.[0] as string) || (m.metadata?.text as string) || '',
       source: (m.metadata?.source as string) || 'unknown',
       chunkStrategy: (m.metadata?.chunk_strategy as string) || 'unknown',
       distance: m.score || 0,
@@ -242,7 +247,9 @@ async function handleQuery(request: Request, env: Env): Promise<Response> {
 
     // Grounded RAG — build prompt with retrieved context
     const contextText = chunks.map((c, i) => `[${i + 1}] ${c.text}`).join('\n\n')
-    const prompt = SINHALA_PROMPT
+    // Gemini models need the softer prompt without the "say it's missing" escape hatch
+    const promptTemplate = modelInfo.provider === 'gemini' ? SINHALA_PROMPT_GEMINI : SINHALA_PROMPT
+    const prompt = promptTemplate
       .replace('{{context}}', contextText)
       .replace('{{question}}', question)
 
