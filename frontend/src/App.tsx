@@ -11,16 +11,11 @@ import { queryRAG, healthCheck } from './lib/api'
 import type { QueryResponse, ModelInfo } from './types'
 
 export default function App() {
-  // App lifecycle
   const [phase, setPhase] = useState<'splash' | 'login' | 'app'>('splash')
-
-  // Theme
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('studymate-theme')
     return saved ? saved === 'dark' : true
   })
-
-  // Query params
   const [mode, setMode] = useState<'rag' | 'baseline_a' | 'baseline_b'>('rag')
   const [collection, setCollection] = useState('syllabus_paragraph_e5')
   const [topK, setTopK] = useState(3)
@@ -30,7 +25,6 @@ export default function App() {
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
 
-  // Refs
   const modeRef = useRef(mode)
   const collectionRef = useRef(collection)
   const topKRef = useRef(topK)
@@ -40,7 +34,6 @@ export default function App() {
   topKRef.current = topK
   modelRef.current = model
 
-  // Apply theme class to body
   useEffect(() => {
     if (darkMode) {
       document.body.classList.remove('light')
@@ -50,7 +43,6 @@ export default function App() {
     localStorage.setItem('studymate-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  // Fetch models after login
   useEffect(() => {
     if (phase !== 'app') return
     healthCheck()
@@ -96,24 +88,20 @@ export default function App() {
     []
   )
 
-  // Splash screen
   if (phase === 'splash') {
     return <SplashScreen onDone={() => setPhase('login')} />
   }
 
-  // Login screen
   if (phase === 'login') {
     return <LoginScreen onLogin={() => setPhase('app')} />
   }
 
-  // Main app
   return (
     <div className="min-h-screen flex flex-col bg-dark">
       <Header darkMode={darkMode} onToggleTheme={() => setDarkMode(d => !d)} />
 
       <div className="flex gap-4 md:gap-6 p-3 md:p-6 flex-1 max-w-[1600px] mx-auto w-full">
         <main className="flex flex-col gap-4 md:gap-5 flex-1 min-w-0">
-          {/* Parameter bar — replaces old sidebar */}
           <ParameterBar
             mode={mode} setMode={setMode}
             collection={collection} setCollection={setCollection}
@@ -131,15 +119,15 @@ export default function App() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
-            <ChunkList chunks={result?.chunks ?? []} loading={loading} />
-            <GeneratedAnswer
-              answer={result?.answer ?? ''}
-              mode={result?.mode ?? mode}
-              latencyMs={result?.latencyMs ?? 0}
-              loading={loading}
-            />
-          </div>
+          {/* Answer — full width */}
+          <GeneratedAnswer
+            answer={result?.answer ?? ''}
+            latencyMs={result?.latencyMs ?? 0}
+            loading={loading}
+          />
+
+          {/* Retrieved chunks — minimal, at the bottom */}
+          <ChunkList chunks={result?.chunks ?? []} loading={loading} />
         </main>
       </div>
       <Footer />
