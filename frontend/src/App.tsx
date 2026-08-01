@@ -143,7 +143,7 @@ export default function App() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            <span className="text-sm font-semibold text-primary truncate">Sinhala RAG · COM738</span>
+            <span className="text-sm font-semibold text-primary truncate">Study Mate AI · COM738</span>
           </div>
 
           <QueryInput onQuery={handleQuery} loading={loading} />
